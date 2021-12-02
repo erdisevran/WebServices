@@ -1,0 +1,115 @@
+*&---------------------------------------------------------------------*
+*& Report  ZCALL_JSON_API_DEMO2
+*&
+*&---------------------------------------------------------------------*
+*&Post yöntemiyle external api çağırma
+*&
+*&---------------------------------------------------------------------*
+
+report  zcall_json_api_demo2.
+
+
+
+  data : lt_desi type table of zmmt_desi_olcum,
+         ls_desi type zmmt_desi_olcum.
+
+  data : lv_url         type string,
+         lo_http_client type ref to if_http_client,
+         lv_json_peyload        type string,
+         lv_json_peyloadx       type xstring,
+         lcl_exsys      type ref to cx_ai_system_fault,
+         lcl_exapp      type ref to cx_ai_application_fault,
+         lv_xresponse   type xstring,
+         lv_response    type string.
+
+
+    lv_url = text-001.
+
+
+  cl_http_client=>create_by_url(
+    exporting
+      url    = lv_url
+    importing
+      client = lo_http_client
+    exceptions
+      argument_not_found = 1
+      plugin_not_active = 2
+      internal_error    = 3
+      others            = 4 ).
+  if sy-subrc <> 0.
+    return.
+  endif.
+
+      lv_json_peyload =  '[ { "attributeId":"whFreight", "attributeValue":"58.2" } ]'.
+
+
+      call function 'SCMS_STRING_TO_XSTRING'
+        exporting
+          text   = lv_json_peyload
+        importing
+          buffer = lv_json_peyloadx.
+
+      lo_http_client->request->set_method( 'POST' ).
+      lo_http_client->request->set_data( lv_json_peyloadx ).
+*      lo_http_client->request->set_cdata( data = lv_json_peyload ).
+      lo_http_client->request->set_content_type( 'APPLICATION/JSON; CHARSET=UTF-8' ).
+*      lo_http_client->request->set_header_field( name = 'Accept-Language' value = 'tr-TR' ).
+
+      try.
+          lo_http_client->send( exporting  timeout = 3
+                                exceptions http_communication_failure = 1
+                                           http_invalid_state         = 2
+                                           http_processing_failed     = 3
+                                           http_invalid_timeout       = 4
+                                           others                     = 5 ).
+
+        catch cx_ai_system_fault into lcl_exsys.
+          lv_response = lcl_exsys->get_text( ).
+          raise raise_http_client_error.
+
+        catch cx_ai_application_fault into lcl_exapp.
+          lv_response = lcl_exapp->get_text( ).
+          raise raise_http_client_error.
+      endtry.
+
+
+      try.
+          lo_http_client->receive( exceptions http_communication_failure = 1
+                                              http_invalid_state         = 2
+                                              http_processing_failed     = 3 ).
+
+        catch cx_ai_system_fault into lcl_exsys.
+          lv_response = lcl_exsys->get_text( ).
+          raise raise_http_client_error.
+
+        catch cx_ai_application_fault into lcl_exapp.
+          lv_response = lcl_exapp->get_text( ).
+          raise raise_http_client_error.
+      endtry.
+
+
+      lv_xresponse = lo_http_client->response->get_data( ).
+
+      if lv_xresponse is initial.
+        message 'Veri Başarıyla Gönderildi' type 'I'.
+      else.
+
+        call function 'ECATT_CONV_XSTRING_TO_STRING'
+          exporting
+            im_xstring    = lv_xresponse
+            im_encoding   = 'UTF-8'
+          importing
+            ex_string     = lv_response
+          exceptions
+            error_message = 98
+            other         = 1.
+
+
+        write lv_response.
+        message 'Veri Gönderimi Başarısız' type 'I' display like 'E'.
+      endif.
+
+       call method lo_http_client->close
+         exceptions
+           http_invalid_state = 1
+           others             = 2.

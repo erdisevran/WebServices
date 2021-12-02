@@ -1,0 +1,142 @@
+*&---------------------------------------------------------------------*
+*& Report  ZCALL_JSON_API_DEMO
+*&
+*&---------------------------------------------------------------------*
+*&Get yöntemiyle external api çağırma
+*&
+*&---------------------------------------------------------------------*
+
+report  zcall_json_api_demo.
+
+"$. Region data def
+  types: begin of ty_users,
+           no      type string,
+           user_id type string,
+           pass    type string,
+         end of ty_users,
+         tt_users type table of ty_users with non-unique default key .
+
+  types: begin of ty_information,
+           text    type string,
+           text2   type string,
+         end of ty_information.
+
+  types: begin of ty_json_import,
+           users       type tt_users,
+           information type ty_information ,
+           yil         type string,
+         end of ty_json_import.
+  data : ls_import type ty_json_import.
+
+
+  data : lo_http_client   type ref to if_http_client,
+         lv_url           type string,
+         lt_errors        type table of string,
+         lv_status_reason type string,
+         lv_status_code   type i,
+         lv_response      type string,
+         lv_token         type string,
+         lv_destination   type char10 value 'MOCKI'.
+
+"$. Endregion data def
+
+
+
+  lv_url = 'https://mocki.io/v1/85142199-0803-4297-acac-12c0d8b44339'.
+
+  cl_http_client=>create_by_url(
+  exporting
+    url                = lv_url
+    "proxy_host         = "Proxy
+    "proxy_service      = "Port
+    "sap_username       = "Username
+    "sap_client         = "Client
+  importing
+    client             = lo_http_client
+  exceptions
+    argument_not_found = 1
+    plugin_not_active  = 2
+    internal_error     = 3
+    ).
+
+  if sy-subrc is not initial.
+    "Error Handling
+  endif.
+
+
+* call method cl_http_client=>create_by_destination
+*  exporting
+*    destination              = lv_destination
+*  importing
+*    client                   = lo_http_client
+*  exceptions
+*    argument_not_found       = 1
+*    destination_not_found    = 2
+*    destination_no_authority = 3
+*    plugin_not_active        = 4
+*    internal_error           = 5
+*    others                   = 6.
+*
+*if sy-subrc <> 0.
+*endif.
+
+lo_http_client->request->set_method( if_http_request=>co_request_method_get )."Get-Post
+*lo_http_client->authenticate( username = lv_username password = lv_password ). "Doğrulama
+*lo_http_client->propertytype_accept_cookie = if_http_client=>co_enabled.
+*lo_http_client->request->set_header_field( name  = if_http_form_fields_sap=>sap_client value = '100' ).
+*lo_http_client->request->set_header_field( name  = '~path' value = 'Cancel' ).
+*lo_http_client->request->set_header_field( name  = '~Content-Type' value = 'application/json' ).
+"lo_http_client->request->set_version( if_http_request=>co_protocol_version_1_0 ).
+
+  lo_http_client->send( ).
+  if sy-subrc is not initial.
+    perform handle_http_exception tables lt_errors
+                                changing lo_http_client.
+    if lt_errors is not initial.
+      "raise send_error.
+    endif.
+  endif.
+
+*Receipt of HTTP Response
+   lo_http_client->receive(
+     exceptions
+       http_communication_failure = 1
+       http_invalid_state = 2
+       http_processing_failed = 3
+    ).
+
+   if sy-subrc is not initial.
+     perform handle_http_exception tables lt_errors
+                                 changing lo_http_client.
+     if lt_errors is not initial.
+     endif.
+   else.
+
+*     lo_http_client->response->get_header_field( EXPORTING name  = 'Token'
+*                                                 IMPORTING value = l_token ).
+     lo_http_client->response->get_status( importing code = lv_status_code
+                                                   reason = lv_status_reason ).
+     lv_response = lo_http_client->response->get_cdata( ).
+     lo_http_client->close( ).
+
+    "/UI2/CL_JSON
+    cl_fdt_json=>json_to_data( exporting iv_json = lv_response
+                               changing  ca_data = ls_import ).
+
+     write lv_response.
+
+   endif.
+
+form handle_http_exception tables lt_errors
+                         changing lo_http_client type ref to if_http_client.
+
+  data : lv_error_message type string.
+
+  lo_http_client->get_last_error(
+    importing
+      message = lv_error_message ).
+  split lv_error_message at cl_abap_char_utilities=>newline into table lt_errors.
+  loop at lt_errors into lv_error_message.
+  endloop.
+  return.
+endform.                    "handle_http_exception
