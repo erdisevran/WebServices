@@ -1,2 +1,2 @@
 # SAP_WebServices
-Abap Webservices
+http json(restful) external-internal web services in sap
