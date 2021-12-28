@@ -88,6 +88,11 @@ report  zcall_json_api_demo2.
       endtry.
 
 
+    "data : lo_conv   TYPE REF TO cl_abap_conv_in_ce,
+    "lv_xresponse = lo_http_client->response->get_data( ).
+    "lo_conv = cl_abap_conv_in_ce=>create( input = lv_bin ).
+    "lo_conv->read( IMPORTING data = lv_response ).
+    
       lv_xresponse = lo_http_client->response->get_data( ).
 
       if lv_xresponse is initial.
