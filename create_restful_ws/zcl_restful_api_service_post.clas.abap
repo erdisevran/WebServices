@@ -112,7 +112,7 @@ method if_http_extension~handle_request.
   server->response->set_header_field( name  = 'Accept-Language' value = 'tr-TR' ).
   server->response->set_content_type( 'application/json' ).
 
-*  server->response->set_status( code = lv_status_code reason = ls_response-message ).
+*  server->response->set_status( code = '200' reason = 'Basarili' ).
 *  server->response->set_data( data = lv_json_xresponse ). "
   server->response->set_cdata( data = lv_json_response ). "
 
